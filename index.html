@@ -1756,33 +1756,66 @@ function importBDF() {
   document.getElementById('fileInput').click();
 }
 
+async function* linesFromFile (file)
+{
+  let textStream = file.stream ().pipeThrough (
+    new TextDecoderStream ('utf-8', { fatal: true }));
+
+  let regex = /\r\n?|\n/g;
+  let remainder = '';
+
+  for await (let text of textStream)
+  {
+    text = remainder + text;
+    let li = 0;
+
+    regex.lastIndex = remainder.length;
+    for (let m; m = regex.exec (text);)
+    {
+      yield text.slice (li, m.index);
+      li = regex.lastIndex;
+    }
+
+    remainder = text.slice (li);
+  }
+
+  yield remainder;
+}
+
 function loadBDFFile(e) {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => parseBDF(ev.target.result);
-  reader.readAsText(file);
   e.target.value = '';
   document.getElementById('fontName').value = file.name.replace(/\.bdf$/i, '') || 'MyFont';
+  parseBDF(linesFromFile(file));
 }
 
-function parseBDF(text) {
+async function parseBDF(lineIter) {
   openModal('fontLoadingModal');
-  // ── Fast line iterator: no upfront split, walks char-by-char ──
-  let pos = 0;
-  const len = text.length;
 
-  function nextLine() {
-    if (pos >= len) return null;
-    const start = pos;
-    while (pos < len && text[pos] !== '\n') pos++;
-    const end = (pos > start && text[pos - 1] === '\r') ? pos - 1 : pos;
-    if (pos < len) pos++; // skip '\n'
-    // manual trim: skip leading spaces/tabs
-    let s = start, e = end;
-    while (s < e && (text[s] === ' ' || text[s] === '\t')) s++;
-    while (e > s && (text[e-1] === ' ' || text[e-1] === '\t')) e--;
-    return text.slice(s, e);
+  // Drive the async generator manually so both the header loop and the
+  // glyph loop share a single iterator position.
+  const iter = lineIter[Symbol.asyncIterator] ? lineIter[Symbol.asyncIterator]() : lineIter;
+
+  // Internal buffer for lines already fetched but not yet consumed.
+  let _done = false;
+  const _buf = [];
+
+  async function _next() {
+    if (_buf.length) return _buf.shift();
+    if (_done) return null;
+    const { value, done } = await iter.next();
+    if (done) { _done = true; return null; }
+    return value;
+  }
+
+  async function nextTrimmed() {
+    while (true) {
+      const raw = await _next();
+      if (raw === null) return null;
+      const t = raw.trim();
+      if (t.length) return t;
+    }
   }
 
   let fontW = state.W, fontH = state.H;
@@ -1791,7 +1824,7 @@ function parseBDF(text) {
   // ── read global header ──
   let headerDone = false;
   while (!headerDone) {
-    const l = nextLine();
+    const l = await nextTrimmed();
     if (l === null) break;
     if (l.startsWith('FONTBOUNDINGBOX')) {
       const parts = l.split(' ');
@@ -1837,9 +1870,8 @@ function parseBDF(text) {
   let bbxW = fontW, bbxH = fontH, bbxX = 0, bbxY = 0;
 
   while (true) {
-    const l = nextLine();
+    const l = await nextTrimmed();
     if (l === null) break;
-    if (!l.length) continue;
 
     const c0 = l[0];
 
@@ -1880,7 +1912,8 @@ function parseBDF(text) {
   updateStats();
   updateTextPreview();
   if (glyphKeys.length) {
-    selectGlyph(glyphKeys.sort((a, b) => a.codePointAt(0) - b.codePointAt(0))[0]);
+    let sortedKeys = glyphKeys.sort((a, b) => a.codePointAt(0) - b.codePointAt(0));
+    selectGlyph(sortedKeys[0] === ' ' && sortedKeys.length > 1 ? sortedKeys[1] : sortedKeys[0]); // prefer first non-space glyph if space is present, since space is invisible and often not the one user wants to see first
   }
   closeModal('fontLoadingModal');
   toast(`Loaded ${glyphKeys.length} glyph(s) (${fontW}×${fontH})`);  
@@ -2171,15 +2204,38 @@ function _runExportCHeader(skipMissing) {
 // ═══════════════════════════════════════════════════
 //  LOAD SAMPLE BDF
 // ═══════════════════════════════════════════════════
+async function* linesFromResponse(response) {
+  const textStream = response.body.pipeThrough(
+    new TextDecoderStream('utf-8', { fatal: true }));
+
+  const regex = /\r\n?|\n/g;
+  let remainder = '';
+
+  for await (const text of textStream) {
+    const chunk = remainder + text;
+    let li = 0;
+
+    regex.lastIndex = remainder.length;
+    for (let m; m = regex.exec(chunk);) {
+      yield chunk.slice(li, m.index);
+      li = regex.lastIndex;
+    }
+
+    remainder = chunk.slice(li);
+  }
+
+  yield remainder;
+}
+
 function loadSampleBDF() {
   fetch('assets/HaxorMedium-12.bdf')
     .then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.text();
+      return r;
     })
-    .then(text => parseBDF(text))
+    .then(r => parseBDF(linesFromResponse(r)))
     .then(() => {
-      document.getElementById('fontName').value = 'HaxorMedium-12';      
+      document.getElementById('fontName').value = 'HaxorMedium-12';
     })
     .catch(err => toast(`Could not load sample: ${err.message}`, true));
 }
