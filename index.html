@@ -812,8 +812,9 @@
 
   <!-- LEFT: settings + glyph list -->
   <div class="panel">
-    <div class="panel-head"><i class="fa-solid fa-gear"></i> Font Settings</div>
+    <div class="panel-head"><i class="fa-solid fa-sliders"></i> Options</div>
     <div class="panel-body scrollbar-thin">
+      <div class="panel-head" style="margin: 0 -14px; padding: 10px 14px;"><i class="fa-solid fa-font"></i> Font Settings</div>
 
       <div>
         <label>Font Name</label>
@@ -847,7 +848,7 @@
 
       <hr class="sep">
       
-      <div class="panel-head" style="margin: 0 -14px; padding: 10px 14px;"><i class="fa-solid fa-info"></i> Info</div>
+      <div class="panel-head" style="margin: 0 -14px; padding: 10px 14px;"><i class="fa-solid fa-info"></i> Font Info</div>
       
       <div class="meta-grid">
         <div class="stat-box">
@@ -867,13 +868,13 @@
 
         <!-- center mark -->
         <div class="helper-row">
-          <label><i class="fa-solid fa-crosshairs"></i> Center mark</label>
+          <label><i class="fa-solid fa-ellipsis"></i><i class="fa-solid fa-ellipsis-vertical" style="margin-left: -1rem;"></i> Center mark</label>
           <button class="helper-toggle on-blue" id="btnCenter" onclick="toggleCenter()"><i class="fa-solid fa-eye"></i></button>
         </div>
         <hr class="sep">
         <!-- helper lines list -->
         <div class="mt-07-rem">
-          <label style="margin-bottom:6px"><i class="fa-solid fa-ellipsis"></i><i class="fa-solid fa-ellipsis-vertical"></i> Guide lines</label>
+          <label style="margin-bottom:6px"><i class="fa-solid fa-ellipsis" style="margin-bottom: -0.25rem;"></i><i class="fa-solid fa-ellipsis-vertical" style="margin-left: -1.25rem;padding-right: 0.25rem;"></i> Guide lines</label>
           <div class="helper-lines-list scrollbar-thin" id="helperLinesList"></div>
         </div>
 
@@ -929,7 +930,7 @@
     <!-- Tab bar -->
     <div class="tab-bar">
       <button class="tab-btn active" id="tabBtnEditor" onclick="switchTab('editor')"><i class="fa-solid fa-pen-to-square"></i> Glyph Editor</button>
-      <button class="tab-btn" id="tabBtnPreview" onclick="switchTab('preview')"><i class="fa-solid fa-font"></i> Text Preview</button>
+      <button class="tab-btn" id="tabBtnPreview" onclick="switchTab('preview')"><i class="fa-regular fa-eye"></i> Text Preview</button>
     </div>
 
     <!-- Tab 1: Pixel editor -->
