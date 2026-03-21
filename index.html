@@ -40,7 +40,7 @@
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
-    overflow-x: hidden;
+    /* overflow-x: hidden; */
   }
 
   header {
@@ -345,7 +345,7 @@
     display: flex;
     align-items: flex-start;
   }
-  #previewCanvas {
+  #textPreviewCanvas {
     image-rendering: pixelated;
     display: block;
     margin: 0 auto;
@@ -428,7 +428,7 @@
     text-transform: uppercase;
   }
 
-  .bdf-preview {
+  .bdf-preview, .uint-preview {
     background: var(--bg);
     border: 1px solid var(--border);
     padding: 10px;
@@ -439,6 +439,10 @@
     overflow-y: auto;
     white-space: pre;
     font-family: 'Share Tech Mono', monospace;
+  }
+
+  .uint-preview {
+    color: var(--accent3);
   }
 
   .scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -484,23 +488,6 @@
     align-items: flex-end;
   }
   .add-row input { flex: 1; }
-
-  .uint-output {
-    background: var(--bg);
-    border: 1px solid var(--accent3);
-    padding: 10px;
-    font-size: 0.63rem;
-    color: var(--accent3);
-    line-height: 1.7;
-    max-height: 160px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-    font-family: 'Share Tech Mono', monospace;
-    display: none;
-    margin-top: 6px;
-  }
-  .uint-output.visible { display: block; }
   
   /* scanline overlay */
   .grid-wrap::before, #textPreviewCanvasWrap::before {
@@ -511,7 +498,7 @@
       rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
     );
     pointer-events: none;
-    z-index: 9999;
+    z-index: 8999;
   }
   .grid-wrap {
     position: relative;
@@ -743,6 +730,18 @@
     justify-content: flex-end;
     gap: 8px;
   }
+  /* ── TOOLTIP ── */
+  .tooltip {
+    display: none;
+    position: absolute;
+    min-width: 120px;
+    padding: 5px;
+    background-color: var(--surface);
+    color: var(--text-dim);
+    border: 1px solid var(--border);    
+    font-size: 0.8rem;
+    z-index: 1000;
+  }
 </style>
 </head>
 <body>
@@ -755,7 +754,7 @@
       <div class="dropdown-content">
         <button onclick="importBDF()">BDF Glyph Font</button>
         <button onclick="importCHeader()">C header file (.h)</button>
-        <button onclick="loadSampleBDF()"><i class="fa-solid fa-star"></i> Load Sample BDF</button>
+        <button onclick="loadSampleBDF()"><i class="fa-solid fa-vial"></i> Load Sample BDF</button>
       </div>
     </div>
     <div class="dropdown">
@@ -766,14 +765,27 @@
       </div>
     </div>
     <div style="width:1px;background:var(--border);margin:0 4px;align-self:stretch"></div>
-    <button class="btn primary" onclick="saveState()" title="Save current state to LocalStorage"><i class="fa-solid fa-floppy-disk"></i> Save</button>
-    <button class="helper-toggle" id="btnAutosave" onclick="toggleAutosave()" title="Auto-save state after every change"><i class="fa-solid fa-clock-rotate-left"></i> Autosave</button>
-    <button class="btn danger" onclick="resetApp()" title="Clear saved state and reset to defaults"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+    <button class="btn primary" onclick="saveState()" data-tooltip="Save current state to LocalStorage"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+    <button class="helper-toggle" id="btnAutosave" onclick="toggleAutosave()" data-tooltip="Auto-save state after every change"><i class="fa-solid fa-clock-rotate-left"></i> Autosave</button>
+    <button class="btn danger" onclick="resetApp()" data-tooltip="Clear saved state and reset to defaults"><i class="fa-solid fa-rotate-left"></i> Reset</button>
 
-    <input type="file" id="fileInput" accept=".bdf" style="display:none" onchange="loadBDFFile(event)">
+    <input type="file" id="fileInput" accept=".bdf" style="display:none" onchange="loadBDFFile(event);">
     <input type="file" id="fileInputH" accept=".h,.c,.txt" style="display:none" onchange="loadCHeaderFile(event)">
   </div>
 </header>
+
+<!-- ── Font Loading MODAL ── -->
+<div class="modal-backdrop" id="fontLoadingModal">
+  <div class="modal">
+    <div class="modal-head"><i class="fa-solid fa-file-code"></i> Loading your font</div>
+    <div class="modal-body">
+      <i class="fa-solid fa-compact-disc fa-spin" style="font-size: 6rem; align-self: center; padding: 2rem;"></i>
+      <div class="modal-warning">
+        <i class="fa-solid fa-triangle-exclamation"></i> <strong>Warning:</strong> Larger fonts with many glyphs may take a few seconds to load. Please wait...
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ── C HEADER EXPORT MODAL ── -->
 <div class="modal-backdrop" id="exportHModal">
@@ -802,7 +814,7 @@
       </div>
     </div>
     <div class="modal-foot">
-      <button class="btn" onclick="closeExportHModal()">Cancel</button>
+      <button class="btn" onclick="closeModal('exportHModal')">Cancel</button>
       <button class="btn orange" onclick="doExportCHeader()"><i class="fa-solid fa-download"></i> Export</button>
     </div>
   </div>
@@ -818,7 +830,7 @@
 
       <div>
         <label>Font Name</label>
-        <input type="text" id="fontName" value="MyFont" oninput="updatePreview(); scheduleAutosave()">
+        <input type="text" id="fontName" value="MyFont" oninput="updateTextPreview(); scheduleAutosave()">
       </div>
 
       <div class="mt-07-rem">
@@ -891,7 +903,7 @@
             <label>Offset</label>
             <input type="number" id="newLineOffset" value="4" min="0" max="63" style="width:56px">
           </div>
-          <button class="btn primary" title="Add helper line" onclick="addHelperLine()" style="align-self:flex-end;padding:7px;font-size: 0.9rem;"><i class="fa-solid fa-plus"></i></button>
+          <button class="btn primary" data-tooltip="Add helper line" onclick="addHelperLine()" style="align-self:flex-end;padding:7px;font-size: 0.9rem;"><i class="fa-solid fa-plus"></i></button>
         </div>
 
         <div class="helper-row mt-07-rem">
@@ -909,13 +921,17 @@
       </div>
       <button class="btn primary" onclick="copyGlyphBDF()" style="width:100%"><i class="fa-regular fa-copy"></i> Copy Glyph BDF</button>
       <hr class="sep">
-      <div class="uint-output scrollbar-thin" id="uintOutput"></div>
-      <button class="btn blue" onclick="exportGlyphUint()" style="width:100%"><i class="fa-regular fa-copy"></i> Copy Glyph as uInt array</button>   
-
+      <div>
+        <label>Current Glyph uInt Array</label>
+        <div class="uint-preview scrollbar-thin" id="uintPreview">— no glyph selected —</div>        
+      </div>
+      <button class="btn blue" onclick="exportGlyphUint()" style="width:100%"><i class="fa-regular fa-copy"></i> Copy Glyph as uInt array</button>
     </div>
+    <hr class="sep">
     <div class="footer">
+
       <a href="https://github.com/B4rt0/BDF-uInt-array-PIXEL-FONT-EDITOR" target="_blank">
-        <i class="fa-brands fa-github" style="font-size: 2rem;"></i>
+        <i class="fa-brands fa-github" style="font-size: 1.7rem;"></i>
       </a>
       B4rt0
       <a href="https://github.com/B4rt0/BDF-uInt-array-PIXEL-FONT-EDITOR/issues" class="btn blue" style="text-decoration: none;">
@@ -972,16 +988,16 @@
         <div class="dim-row p-lr-15-rem" style="width: 100%;align-items: center;">
           <div>
             <label>Preview Text</label>
-            <!-- <input type="text" id="previewInput" value="Hello World!" oninput="updatePreview(); scheduleAutosave()"> -->
-            <textarea id="previewInput" rows="3" oninput="updatePreview(); scheduleAutosave()">Hello
+            <!-- <input type="text" id="textPreviewInput" value="Hello World!" oninput="updateTextPreview(); scheduleAutosave()"> -->
+            <textarea id="textPreviewInput" rows="3" oninput="updateTextPreview(); scheduleAutosave()">Hello
 World!</textarea>
           </div>
           <div style="padding-left: 2rem;">
-            <button class="helper-toggle on-orange" id="btnPreviewGaps" onclick="togglePreviewGaps()" title="Toggle pixel gaps in preview" style="font-size: 0.8rem; padding: 7px 10px;"><i class="fa-solid fa-table-cells-large"></i> Toggle Grid Gaps</button>
+            <button class="helper-toggle on-orange" id="btnPreviewGaps" onclick="togglePreviewGaps()" data-tooltip="Toggle pixel gaps in preview" style="font-size: 0.8rem; padding: 7px 10px;"><i class="fa-solid fa-table-cells-large"></i> Toggle Grid Gaps</button>
           </div>
         </div>
         <div id="textPreviewCanvasWrap" class="scrollbar-thin">
-          <canvas id="previewCanvas"></canvas>
+          <canvas id="textPreviewCanvas"></canvas>
         </div>
       </div>
 
@@ -1080,8 +1096,34 @@ window.onload = () => {
         document.getElementById('exportModeBlank').checked ? 'block' : 'none';
     });
   });
-  document.getElementById('exportHModal').addEventListener('click', e => {
-    if (e.target === e.currentTarget) closeExportHModal();
+  // Wire export modal backdrop click to close
+  document.querySelectorAll('.modal-backdrop').forEach(modal => {
+    modal.addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeModal(modal.id);
+    });
+  });
+
+  // Tooltips
+  const tooltip = document.createElement("div");
+  tooltip.className = "tooltip";
+  tooltip.role = "tooltip";
+  document.body.appendChild(tooltip);
+  const tooltipStyle = getComputedStyle(tooltip);
+  const tooltipMinWidth = Math.ceil(parseFloat(tooltipStyle.minWidth)) + Math.ceil(parseFloat(tooltipStyle.borderLeftWidth)) + Math.ceil(parseFloat(tooltipStyle.borderRightWidth)); // get total minimum width including borders from CSS
+
+  document.querySelectorAll("[data-tooltip]").forEach(elem => {
+    elem.addEventListener("mouseenter", function() {
+      tooltip.textContent = this.dataset.tooltip;
+      const rect = this.getBoundingClientRect();
+      const offsetX = (rect.left + window.scrollX + tooltipMinWidth > window.innerWidth) ? Math.abs(window.innerWidth - rect.left - window.scrollX - tooltipMinWidth) : 0;
+      tooltip.style.left = rect.left + window.scrollX - offsetX + "px";
+      tooltip.style.top = rect.bottom + window.scrollY + 1 + "px";
+      tooltip.style.display = "block";
+    });
+
+    elem.addEventListener("mouseleave", function() {
+      tooltip.style.display = "none";
+    });
   });
 
   // Restore autosave preference first (before state, so scheduleAutosave works)
@@ -1118,7 +1160,7 @@ function onSizeChange() {
   buildGrid();
   if (state.current) loadGlyphToGrid(state.current);
   updateStats();
-  updatePreview();
+  updateTextPreview();
   scheduleAutosave();
 }
 
@@ -1196,8 +1238,8 @@ function applyTool(x, y) {
   }
   syncGrid();
   refreshGlyphThumb(state.current);
-  updateBDFPreview();
-  updatePreview();
+  updateBDFPreview(); updateUintPreview();
+  updateTextPreview();
   scheduleAutosave();
 }
 
@@ -1254,15 +1296,15 @@ function clearGrid() {
   state.glyphs[state.current].fill(0);
   syncGrid();
   refreshGlyphThumb(state.current);
-  updateBDFPreview();
-  updatePreview();
+  updateBDFPreview(); updateUintPreview();
+  updateTextPreview();
   scheduleAutosave();
 }
 
 function loadGlyphToGrid(ch) {
   if (!state.glyphs[ch]) return;
   syncGrid();
-  updateBDFPreview();
+  updateBDFPreview(); updateUintPreview();
 }
 
 // ═══════════════════════════════════════════════════
@@ -1324,11 +1366,11 @@ function deleteGlyph(ch) {
     state.current = null;
     pixels.forEach(c => c.classList.remove('on'));
     document.getElementById('editorBigLabel').textContent = '?';
-    document.getElementById('bdfPreview').textContent = '— brak zaznaczonego glifa —';
+    updateBDFPreview(); updateUintPreview();
   }
   renderGlyphList();
   updateStats();
-  updatePreview();
+  updateTextPreview();
   scheduleAutosave();
 }
 
@@ -1350,8 +1392,8 @@ function selectGlyph(ch) {
   state.current = ch;
   document.getElementById('editorBigLabel').textContent = ch;
   syncGrid();
-  updateBDFPreview();
-  updatePreview();
+  updateBDFPreview(); updateUintPreview();
+  updateTextPreview();
   switchTab('editor');
   
   // Update active state directly on existing DOM nodes — no full rebuild
@@ -1504,7 +1546,7 @@ function switchTab(name) {
   document.getElementById('tab' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
   if (name === 'preview') {
     if(!Object.keys(state.glyphs).length) toast('There are no glyphs to preview!', true)
-    updatePreview() 
+    updateTextPreview() 
   };
   state.centerTab = name;
   scheduleAutosave();
@@ -1549,7 +1591,7 @@ function transformGlyph(op) {
     }
   }
   state.glyphs[state.current].set(n);
-  syncGrid(); refreshGlyphThumb(state.current); updateBDFPreview(); updatePreview();
+  syncGrid(); refreshGlyphThumb(state.current); updateBDFPreview(); updateTextPreview();
   scheduleAutosave();
 }
 
@@ -1725,6 +1767,7 @@ function loadBDFFile(e) {
 }
 
 function parseBDF(text) {
+  openModal('fontLoadingModal');
   // ── Fast line iterator: no upfront split, walks char-by-char ──
   let pos = 0;
   const len = text.length;
@@ -1835,20 +1878,21 @@ function parseBDF(text) {
   const glyphKeys = Object.keys(state.glyphs);
   renderGlyphList();
   updateStats();
-  updatePreview();
+  updateTextPreview();
   if (glyphKeys.length) {
     selectGlyph(glyphKeys.sort((a, b) => a.codePointAt(0) - b.codePointAt(0))[0]);
   }
-  toast(`Loaded ${glyphKeys.length} glyph(s) (${fontW}×${fontH})`);
+  closeModal('fontLoadingModal');
+  toast(`Loaded ${glyphKeys.length} glyph(s) (${fontW}×${fontH})`);  
   scheduleAutosave();
 }
 
 // ═══════════════════════════════════════════════════
 //  PREVIEW
 // ═══════════════════════════════════════════════════
-function updatePreview() {
-  const text = document.getElementById('previewInput').value;
-  const canvas = document.getElementById('previewCanvas');
+function updateTextPreview() {
+  const text = document.getElementById('textPreviewInput').value;
+  const canvas = document.getElementById('textPreviewCanvas');
   const W = state.W, H = state.H;
   const cs = state.cellSizePreview;
   const gap = state.previewGaps ? 2 : 0;
@@ -1902,7 +1946,7 @@ function togglePreviewGaps() {
   state.previewGaps = !state.previewGaps;
   const btn = document.getElementById('btnPreviewGaps');
   btn.className = 'helper-toggle' + (state.previewGaps ? ' on-orange' : '');
-  updatePreview();
+  updateTextPreview();
   scheduleAutosave();
 }
 
@@ -1910,6 +1954,20 @@ function updateBDFPreview() {
   const el = document.getElementById('bdfPreview');
   if (!state.current) { el.textContent = '— no glyph selected —'; return; }
   el.textContent = glyphToBDF(state.current, state.glyphs[state.current], state.W, state.H);
+}
+
+function updateUintPreview() {
+  const el = document.getElementById('uintPreview');
+  if (!state.current) { el.textContent = '— no glyph selected —'; el.classList.remove('visible'); return; }
+  const bm = state.glyphs[state.current];
+  const W = state.W, H = state.H;
+  const { typeName } = uintTypeForWidth(W);
+  const rows = bitmapToUintRows(bm, W, H);
+  const cp = state.current.codePointAt(0);
+  const charLabel = state.current === ' ' ? 'SPACE' : state.current;
+  const varName = `glyph_${charLabel}_${W}x${H}`;
+  el.textContent = `// U+${cp.toString(16).toUpperCase().padStart(4,'0')} '${charLabel}' — ${W}×${H} px\nconst ${typeName} ${varName}[${H}] = {\n  ${rows.join(',\n  ')}\n};`;
+  el.classList.add('visible');
 }
 
 function updateStats() {
@@ -1940,7 +1998,7 @@ function onZoomPreviewChange() {
   const z = parseInt(document.getElementById('zoomSliderPreview').value);
   state.cellSizePreview = z;
   document.getElementById('zoomLabelPreview').textContent = `${z} px / pixel`;
-  updatePreview();
+  updateTextPreview();
   scheduleAutosave();
 }
 
@@ -1991,18 +2049,12 @@ function uintRowsToBitmap(rows, W, H) {
 
 function exportGlyphUint() {
   if (!state.current) { toast('No glyph selected', true); return; }
-  const bm = state.glyphs[state.current];
-  const W = state.W, H = state.H;
-  const { typeName } = uintTypeForWidth(W);
-  const rows = bitmapToUintRows(bm, W, H);
-  const cp = state.current.codePointAt(0);
-  const charLabel = state.current === ' ' ? 'SPACE' : state.current;
-  const varName = `glyph_${charLabel}_${W}x${H}`;
-  const code = `// U+${cp.toString(16).toUpperCase().padStart(4,'0')} '${charLabel}' — ${W}×${H} px\nconst ${typeName} ${varName}[${H}] = {\n  ${rows.join(',\n  ')}\n};`;
-  navigator.clipboard.writeText(code).then(() => toast(`Copied as ${typeName}[${H}]`));
-  const box = document.getElementById('uintOutput');
-  box.textContent = code;
-  box.classList.add('visible');
+  updateUintPreview();
+  const code = document.getElementById('uintPreview').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const { typeName } = uintTypeForWidth(state.W);
+    toast(`Copied as ${typeName}[${state.H}]`);
+  });
 }
 
 // ═══════════════════════════════════════════════════
@@ -2018,12 +2070,8 @@ function exportCHeader() {
   document.getElementById('exportHModal').classList.add('open');
 }
 
-function closeExportHModal() {
-  document.getElementById('exportHModal').classList.remove('open');
-}
-
 function doExportCHeader() {
-  closeExportHModal();
+  closeModal('exportHModal');
   const skipMissing = document.getElementById('exportModeSkip').checked;
   _runExportCHeader(skipMissing);
 }
@@ -2131,8 +2179,7 @@ function loadSampleBDF() {
     })
     .then(text => parseBDF(text))
     .then(() => {
-      document.getElementById('fontName').value = 'HaxorMedium-12';
-      //toast('Sample font loaded: HaxorMedium-12.bdf');
+      document.getElementById('fontName').value = 'HaxorMedium-12';      
     })
     .catch(err => toast(`Could not load sample: ${err.message}`, true));
 }
@@ -2210,7 +2257,7 @@ function parseCHeader(text) {
   buildGrid();
   renderGlyphList();
   updateStats();
-  updatePreview();
+  updateTextPreview();
   const keys = Object.keys(newGlyphs).sort((a, b) => a.codePointAt(0) - b.codePointAt(0));
   if (keys.length) selectGlyph(keys[0]);
   toast(`Imported ${count} glyph(s) from .h (${W}×${H})`);
@@ -2409,7 +2456,7 @@ function serializeState() {
     fontName:        document.getElementById('fontName').value,
     offsetX:         document.getElementById('offsetX').value,
     offsetY:         document.getElementById('offsetY').value,
-    previewText:     document.getElementById('previewInput').value,
+    previewText:     document.getElementById('textPreviewInput').value,
   });
 }
 
@@ -2446,7 +2493,7 @@ function applySerializedState(json) {
   document.getElementById('glyphH').value      = state.H;
   document.getElementById('offsetX').value     = saved.offsetX     ?? 0;
   document.getElementById('offsetY').value     = saved.offsetY     ?? 0;
-  document.getElementById('previewInput').value = saved.previewText ?? document.getElementById('previewInput').value;
+  document.getElementById('textPreviewInput').value = saved.previewText ?? document.getElementById('textPreviewInput').value;
 
   // Restore zoom sliders
   const zoomSlider = document.getElementById('zoomSlider');
@@ -2485,7 +2532,7 @@ function applySerializedState(json) {
   renderGlyphList();
   renderHelperLinesList();
   updateStats();
-  updatePreview();
+  updateTextPreview();
   drawOverlay();
   switchTab(saved.centerTab ?? 'editor');
 
@@ -2495,7 +2542,7 @@ function applySerializedState(json) {
     state.current = cur;
     document.getElementById('editorBigLabel').textContent = cur;
     syncGrid();
-    updateBDFPreview();
+    updateBDFPreview(); updateUintPreview();
     const list = document.getElementById('glyphList');
     const target = list.querySelector(`[data-ch="${CSS.escape(cur)}"]`);
     if (target) {
@@ -2565,6 +2612,18 @@ function toast(msg, error = false) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
 }
+
+// ═══════════════════════════════════════════════════
+//  MODAL
+// ═══════════════════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/js/all.min.js" integrity="sha512-6BTOlkauINO65nLhXhthZMtepgJSghyimIalb+crKRPhvhmsCdnIuGcVbR5/aQY2A+260iC1OPy1oCdB6pSSwQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </body>
