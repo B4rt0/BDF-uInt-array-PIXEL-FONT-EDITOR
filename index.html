@@ -455,7 +455,7 @@
     position: fixed;
     bottom: 64px; 
     left: 50%; 
-    transform: translateX(-50%) translateY(128px);
+    transform: translateX(-50%) translateY(256px);
     background: var(--surface2);
     padding: 10px 20px;
     font-size: 1rem;
@@ -1041,7 +1041,7 @@ World!</textarea>
 
 </div>
 
-<div id="toast" class="toast-success">✓ Operacja zakończona</div>
+<div id="toast" class="toast-success">✓ Operation finished</div>
 
 <script>
 // ═══════════════════════════════════════════════════
@@ -1149,12 +1149,12 @@ function onSizeChange() {
   let h = clamp(parseInt(document.getElementById('glyphH').value)||16,1,64);
   if (w === state.W && h === state.H) return;
   // resize existing glyphs
-  for (let ch in state.glyphs) {
-    state.glyphs[ch] = resizeBitmap(state.glyphs[ch], state.W, state.H, w, h);
+  for (const cp in state.glyphs) {
+    state.glyphs[cp] = resizeBitmap(state.glyphs[cp], state.W, state.H, w, h);
   }
   state.W = w; state.H = h;
   buildGrid();
-  if (state.current) loadGlyphToGrid(state.current);
+  if (state.current !== null) loadGlyphToGrid(state.current);
   updateStats();
   updateTextPreview();
   scheduleAutosave();
@@ -1169,6 +1169,9 @@ function resizeBitmap(old, ow, oh, nw, nh) {
 }
 
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+// Codepoint ↔ character helpers
+const cpToChar = cp => String.fromCodePoint(cp);
+const charToCp = ch => ch.codePointAt(0);
 
 // ═══════════════════════════════════════════════════
 //  GRID
@@ -1205,7 +1208,7 @@ function buildGrid() {
 }
 
 function onCellDown(e) {
-  if (!state.current) {
+  if (state.current === null) {
     toast("You must choose/add a glyph first from the Glyphs List to the right!", true)
     return
   }
@@ -1221,7 +1224,7 @@ function onCellDown(e) {
 }
 
 function onCellEnter(e) {
-  if (!state.painting || !state.current) return;
+  if (!state.painting || state.current === null) return;
   if (state.tool === 'fill') return;
   applyTool(+e.target.dataset.x, +e.target.dataset.y);
 }
@@ -1240,26 +1243,26 @@ function applyTool(x, y) {
 }
 
 function setPixel(x, y, v) {
-  if (!state.current) return;
+  if (state.current === null) return;
   state.glyphs[state.current][y * state.W + x] = v;
   const cell = pixels[y * state.W + x];
   cell.classList.toggle('on', !!v);
 }
 
 function syncGrid() {
-  if (!state.current) return;
+  if (state.current === null) return;
   const bm = state.glyphs[state.current];
   pixels.forEach((cell, i) => cell.classList.toggle('on', !!bm[i]));
 }
 
 // Repaint only the thumbnail canvas for one glyph in the list panel
-function refreshGlyphThumb(ch) {
+function refreshGlyphThumb(cp) {
   const list = document.getElementById('glyphList');
-  const wrapper = list.querySelector(`[data-ch="${CSS.escape(ch)}"]`);
+  const wrapper = list.querySelector(`[data-ch="${cp}"]`);
   if (!wrapper) return;
   const canvas = wrapper.querySelector('canvas.glyph-thumb');
   if (!canvas) return;
-  const bm = state.glyphs[ch];
+  const bm = state.glyphs[cp];
   if (!bm) return;
   const ctx = canvas.getContext('2d');
   const img = ctx.createImageData(state.W, state.H);
@@ -1288,7 +1291,7 @@ function floodFill(sx, sy, target, replacement) {
 }
 
 function clearGrid() {
-  if (!state.current) return;
+  if (state.current === null) return;
   state.glyphs[state.current].fill(0);
   syncGrid();
   refreshGlyphThumb(state.current);
@@ -1309,56 +1312,58 @@ function loadGlyphToGrid(ch) {
 function addGlyph(input) {
   const ch = input.value;
   if (!ch) return;
-  addSingleGlyph(ch);
+  const cp = charToCp(ch);
+  addSingleGlyph(cp);
   renderGlyphList();
   updateStats();
   input.value = '';
-  selectGlyph(ch);
+  selectGlyph(cp);
   scheduleAutosave();
 }
-function addSingleGlyph(ch) {
-  if (!state.glyphs[ch]) {
-    state.glyphs[ch] = new Uint8Array(state.W * state.H);
+function addSingleGlyph(cp) {
+  if (!state.glyphs[cp]) {
+    state.glyphs[cp] = new Uint8Array(state.W * state.H);
   }
   // NOTE: caller is responsible for calling renderGlyphList() and updateStats()
-  return ch;
+  return cp;
 }
 
 function addCharSet(chars) {
   let added = 0;
   for (const ch of chars) {
-    if (!state.glyphs[ch]) {
-      state.glyphs[ch] = new Uint8Array(state.W * state.H);
+    const cp = charToCp(ch);
+    if (!state.glyphs[cp]) {
+      state.glyphs[cp] = new Uint8Array(state.W * state.H);
       added += 1;
     }
   }
   
   renderGlyphList();
   updateStats();
-  if (!state.current && chars.length) selectGlyph(chars[0]);
+  if (state.current === null && chars.length) selectGlyph(charToCp(chars[0]));
   toast(`Added ${added} new glyph(s)`);
   scheduleAutosave();
 }
 
 function addASCIICharSet(start, stop) {
   let added = 0;
-  for (let i = start; i <= stop; i++) {
-    if (!state.glyphs[String.fromCharCode(i)]) {
-      state.glyphs[String.fromCharCode(i)] = new Uint8Array(state.W * state.H);
+  for (let cp = start; cp <= stop; cp++) {
+    if (!state.glyphs[cp]) {
+      state.glyphs[cp] = new Uint8Array(state.W * state.H);
       added += 1;
     }
   }
   
   renderGlyphList();
   updateStats();
-  if (!state.current && (stop-start > 0)) selectGlyph(String.fromCharCode(start));
+  if (state.current === null && (stop - start > 0)) selectGlyph(start);
   toast(`Added ${added} new glyph(s)`);
   scheduleAutosave();
 }
 
-function deleteGlyph(ch) {
-  delete state.glyphs[ch];
-  if (state.current === ch) {
+function deleteGlyph(cp) {
+  delete state.glyphs[cp];
+  if (state.current === cp) {
     state.current = null;
     pixels.forEach(c => c.classList.remove('on'));
     document.getElementById('editorBigLabel').textContent = '?';
@@ -1370,23 +1375,24 @@ function deleteGlyph(ch) {
   scheduleAutosave();
 }
 
-function copyGlyphAs(srcCh, destCh) {
+function copyGlyphAs(srcCp, destCh) {
   if (!destCh || destCh.length === 0) { toast('Enter a target character'); return; }
-  if (!state.glyphs[srcCh]) { toast('Source glyph not found'); return; }
-  state.glyphs[destCh] = new Uint8Array(state.glyphs[srcCh]);
+  if (!state.glyphs[srcCp]) { toast('Source glyph not found'); return; }
+  const destCp = charToCp(destCh);
+  state.glyphs[destCp] = new Uint8Array(state.glyphs[srcCp]);
   renderGlyphList();
   updateStats();
-  selectGlyph(destCh);
-  const srcLabel = srcCh === ' ' ? '·' : srcCh;
-  const dstLabel = destCh === ' ' ? '·' : destCh;
+  selectGlyph(destCp);
+  const srcLabel = srcCp === 32 ? '·' : cpToChar(srcCp);
+  const dstLabel = destCp === 32 ? '·' : cpToChar(destCp);
   toast(`Copied "${srcLabel}" → "${dstLabel}"`);
   scheduleAutosave();
 }
 
-function selectGlyph(ch) {
+function selectGlyph(cp) {
   saveCurrentGlyph();
-  state.current = ch;
-  document.getElementById('editorBigLabel').textContent = ch;
+  state.current = cp;
+  document.getElementById('editorBigLabel').textContent = cpToChar(cp);
   syncGrid();
   updateBDFPreview(); updateUintPreview();
   updateTextPreview();
@@ -1395,7 +1401,7 @@ function selectGlyph(ch) {
   // Update active state directly on existing DOM nodes — no full rebuild
   const list = document.getElementById('glyphList');
   list.querySelectorAll('.glyph-item').forEach(el => el.classList.remove('active'));
-  const target = list.querySelector(`[data-ch="${CSS.escape(ch)}"]`);
+  const target = list.querySelector(`[data-ch="${cp}"]`);
   if (target) {
     target.querySelector('.glyph-item').classList.add('active');
     target.scrollIntoView({ block: 'nearest', behavior: 'instant' });
@@ -1422,19 +1428,20 @@ function renderGlyphList() {
   list.parentNode.replaceChild(placeholder, list);
   list.innerHTML = '';
 
-  const sorted = Object.keys(state.glyphs).sort((a, b) => a.codePointAt(0) - b.codePointAt(0));
+  const sorted = Object.keys(state.glyphs).map(Number).sort((a, b) => a - b);
   const aspect = state.W / state.H;
   const thumbW = aspect >= 1 ? 24 : Math.round(24 * aspect);
   const thumbH = aspect >= 1 ? Math.round(24 / aspect) : 24;
   const fragment = document.createDocumentFragment();
 
-  for (const ch of sorted) {
+  for (const cp of sorted) {
+    const ch = cpToChar(cp);
     const wrapper = document.createElement('div');
-    wrapper.dataset.ch = ch;
+    wrapper.dataset.ch = cp;
 
     const item = document.createElement('div');
-    item.className = 'glyph-item' + (ch === state.current ? ' active' : '');
-    item.onclick = () => selectGlyph(ch);
+    item.className = 'glyph-item' + (cp === state.current ? ' active' : '');
+    item.onclick = () => selectGlyph(cp);
 
     // Canvas: create at correct size but don't paint yet
     const canvas = document.createElement('canvas');
@@ -1444,12 +1451,12 @@ function renderGlyphList() {
     canvas.style.width  = thumbW + 'px';
     canvas.style.height = thumbH + 'px';
     // Queue for deferred painting
-    _thumbQueue.push({ canvas, ch });
+    _thumbQueue.push({ canvas, cp });
 
     const label = document.createElement('div');
     label.className = 'glyph-label';
-    const cp = ch.codePointAt(0).toString(16).toUpperCase().padStart(4,'0');
-    label.innerHTML = `<strong>${ch === ' ' ? '·' : ch}</strong> U+${cp}`;
+    const cpHex = cp.toString(16).toUpperCase().padStart(4,'0');
+    label.innerHTML = `<strong>${cp === 32 ? '·' : ch}</strong> U+${cpHex}`;
 
     const copyBtn = document.createElement('div');
     copyBtn.className = 'glyph-copy';
@@ -1469,9 +1476,9 @@ function renderGlyphList() {
       const okBtn = document.createElement('button');
       okBtn.innerHTML = '<i class="fa-solid fa-check">✔</i>';
       okBtn.title = 'Clone';
-      okBtn.onclick = () => { copyGlyphAs(ch, inp.value); row.remove(); };
+      okBtn.onclick = () => { copyGlyphAs(cp, inp.value); row.remove(); };
       inp.addEventListener('keydown', e => {
-        if (e.key === 'Enter') { copyGlyphAs(ch, inp.value); row.remove(); }
+        if (e.key === 'Enter') { copyGlyphAs(cp, inp.value); row.remove(); }
         if (e.key === 'Escape') row.remove();
       });
       const cancelBtn = document.createElement('button');
@@ -1489,7 +1496,7 @@ function renderGlyphList() {
     del.className = 'glyph-del';
     del.title = 'Delete glyph';
     del.innerHTML = '<i class="fa-solid fa-xmark">x</i>';
-    del.onclick = (e) => { e.stopPropagation(); deleteGlyph(ch); };
+    del.onclick = (e) => { e.stopPropagation(); deleteGlyph(cp); };
 
     item.appendChild(canvas);
     item.appendChild(label);
@@ -1511,8 +1518,8 @@ function _drainThumbQueue(start) {
   const BATCH = 40;
   const end = Math.min(start + BATCH, _thumbQueue.length);
   for (let i = start; i < end; i++) {
-    const { canvas, ch } = _thumbQueue[i];
-    const bm = state.glyphs[ch];
+    const { canvas, cp } = _thumbQueue[i];
+    const bm = state.glyphs[cp];
     if (!bm) continue;
     const ctx = canvas.getContext('2d');
     const img = ctx.createImageData(state.W, state.H);
@@ -1562,7 +1569,7 @@ function setTool(t) {
 //  TRANSFORMS
 // ═══════════════════════════════════════════════════
 function transformGlyph(op) {
-  if (!state.current) return;
+  if (state.current === null) return;
   const W = state.W, H = state.H;
   const bm = state.glyphs[state.current];
   const n = new Uint8Array(W * H);
@@ -1659,8 +1666,7 @@ function tightBBox(bm, W, H) {
   return { minX, maxX, minY, maxY };
 }
 
-function glyphToBDF(ch, bm, W, H) {
-  const cp = ch.codePointAt(0);
+function glyphToBDF(cp, bm, W, H) {
   const name = `U+${cp.toString(16).toUpperCase().padStart(4,'0')}`;
   const globalOffsetX = parseInt(document.getElementById('offsetX').value) || 0;
   const globalOffsetY = parseInt(document.getElementById('offsetY').value) || 0;
@@ -1706,7 +1712,7 @@ function glyphToBDF(ch, bm, W, H) {
 function generateBDF() {
   const name = document.getElementById('fontName').value || 'MyFont';
   const W = state.W, H = state.H;
-  const glyphs = Object.keys(state.glyphs).sort((a,b) => a.codePointAt(0) - b.codePointAt(0));
+  const glyphs = Object.keys(state.glyphs).map(Number).sort((a, b) => a - b);
   const now = new Date();
   const dateStr = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
   const offsetY = parseInt(document.getElementById('offsetY').value) || 0;
@@ -1728,7 +1734,7 @@ function generateBDF() {
     `CREATION_DATE "${dateStr}"`,
     `ENDPROPERTIES`,
     `CHARS ${glyphs.length}`,
-    ...glyphs.map(ch => glyphToBDF(ch, state.glyphs[ch], W, H)),
+    ...glyphs.map(cp => glyphToBDF(cp, state.glyphs[cp], W, H)),
     `ENDFONT`,
     ``
   ];
@@ -1875,9 +1881,8 @@ async function parseBDF(lineIter) {
     if (inBitmap) {
       if (c0 === 'E' && l === 'ENDCHAR') {
         if (encoding > 0) {
-          const ch = String.fromCodePoint(encoding);
           const destY = fontAscent - bbxH - bbxY;
-          state.glyphs[ch] = hexRowsToBitmap(hexRows, fontW, fontH, bbxW, bbxX, destY);
+          state.glyphs[encoding] = hexRowsToBitmap(hexRows, fontW, fontH, bbxW, bbxX, destY);
         }
         inBitmap = false; encoding = -1;
         bbxW = fontW; bbxH = fontH; bbxX = 0; bbxY = 0;
@@ -1904,13 +1909,14 @@ async function parseBDF(lineIter) {
   }
 
   // ── Build DOM list with deferred thumbnail painting ──
-  const glyphKeys = Object.keys(state.glyphs);
+  const glyphKeys = Object.keys(state.glyphs).map(Number);
   renderGlyphList();
   updateStats();
   updateTextPreview();
   if (glyphKeys.length) {
-    let sortedKeys = glyphKeys.sort((a, b) => a.codePointAt(0) - b.codePointAt(0));
-    selectGlyph(sortedKeys[0] === ' ' && sortedKeys.length > 1 ? sortedKeys[1] : sortedKeys[0]); // prefer first non-space glyph if space is present, since space is invisible and often not the one user wants to see first
+    const sortedKeys = glyphKeys.sort((a, b) => a - b);
+    // prefer first non-space glyph (space is invisible and often not what user wants to see first)
+    selectGlyph(sortedKeys[0] === 32 && sortedKeys.length > 1 ? sortedKeys[1] : sortedKeys[0]);
   }
   closeModal('fontLoadingModal');
   toast(`Loaded ${glyphKeys.length} glyph(s) (${fontW}×${fontH})`);  
@@ -1954,8 +1960,8 @@ function updateTextPreview() {
     const line = lines[li];
     const oy = li * (lineH + lineGap);
     for (let ci = 0; ci < line.length; ci++) {
-      const ch = line[ci];
-      const bm = state.glyphs[ch];
+      const cp = line.codePointAt(ci);
+      const bm = state.glyphs[cp];
       const ox = ci * (charStride + charGap);
       for (let y = 0; y < H; y++) {
         for (let x = 0; x < W; x++) {
@@ -1982,19 +1988,19 @@ function togglePreviewGaps() {
 
 function updateBDFPreview() {
   const el = document.getElementById('bdfPreview');
-  if (!state.current) { el.textContent = '— no glyph selected —'; return; }
+  if (state.current === null) { el.textContent = '— no glyph selected —'; return; }
   el.textContent = glyphToBDF(state.current, state.glyphs[state.current], state.W, state.H);
 }
 
 function updateUintPreview() {
   const el = document.getElementById('uintPreview');
-  if (!state.current) { el.textContent = '— no glyph selected —'; el.classList.remove('visible'); return; }
+  if (state.current === null) { el.textContent = '— no glyph selected —'; el.classList.remove('visible'); return; }
   const bm = state.glyphs[state.current];
   const W = state.W, H = state.H;
   const { typeName } = uintTypeForWidth(W);
   const rows = bitmapToUintRows(bm, W, H);
-  const cp = state.current.codePointAt(0);
-  const charLabel = state.current === ' ' ? 'SPACE' : state.current;
+  const cp = state.current;
+  const charLabel = cp === 32 ? 'SPACE' : cpToChar(cp);
   const varName = `glyph_${charLabel}_${W}x${H}`;
   el.textContent = `// U+${cp.toString(16).toUpperCase().padStart(4,'0')} '${charLabel}' — ${W}×${H} px\nconst ${typeName} ${varName}[${H}] = {\n  ${rows.join(',\n  ')}\n};`;
   el.classList.add('visible');
@@ -2036,7 +2042,7 @@ function onZoomPreviewChange() {
 //  COPY
 // ═══════════════════════════════════════════════════
 function copyGlyphBDF() {
-  if (!state.current) { toast('No glyph selected'); return; }
+  if (state.current === null) { toast('No glyph selected'); return; }
   const txt = glyphToBDF(state.current, state.glyphs[state.current], state.W, state.H);
   navigator.clipboard.writeText(txt).then(() => toast('Glyph BDF copied'));
 }
@@ -2078,7 +2084,7 @@ function uintRowsToBitmap(rows, W, H) {
 }
 
 function exportGlyphUint() {
-  if (!state.current) { toast('No glyph selected', true); return; }
+  if (state.current === null) { toast('No glyph selected', true); return; }
   updateUintPreview();
   const code = document.getElementById('uintPreview').textContent;
   navigator.clipboard.writeText(code).then(() => {
@@ -2107,16 +2113,15 @@ function doExportCHeader() {
 }
 
 function _runExportCHeader(skipMissing) {
-  const glyphKeys = Object.keys(state.glyphs);
+  const glyphKeys = Object.keys(state.glyphs).map(Number);
   const fontName = (document.getElementById('fontName').value || 'MyFont')
     .replace(/[^a-zA-Z0-9_]/g, '_');
   const W = state.W, H = state.H;
   const { typeName } = uintTypeForWidth(W);
   const guard = `${fontName.toUpperCase()}_H`;
 
-  const codepoints = glyphKeys.map(ch => ch.codePointAt(0));
   const minCp = 0;
-  const maxCp = Math.max(...codepoints);
+  const maxCp = Math.max(...glyphKeys);
 
   const hexWidth = uintTypeForWidth(W).bits / 4;
   const blankRow = '0x' + '0'.padStart(hexWidth, '0');
@@ -2126,13 +2131,12 @@ function _runExportCHeader(skipMissing) {
   const slots = [];
   if (skipMissing) {
     // Only defined glyphs, sorted by codepoint
-    const defined = glyphKeys
-      .sort((a, b) => a.codePointAt(0) - b.codePointAt(0));
-    defined.forEach((ch, idx) => slots.push({ cp: ch.codePointAt(0), ch, idx }));
+    glyphKeys.sort((a, b) => a - b)
+      .forEach((cp, idx) => slots.push({ cp, idx }));
   } else {
     // Full contiguous range from 0 to maxCp, blanks for missing
     for (let cp = minCp; cp <= maxCp; cp++) {
-      slots.push({ cp, ch: String.fromCodePoint(cp), idx: cp });
+      slots.push({ cp, idx: cp });
     }
   }
 
@@ -2146,7 +2150,7 @@ function _runExportCHeader(skipMissing) {
   lines.push(`/* Font: ${fontName} */`);
   lines.push(`/* Generated by BDF Font Editor */`);
   if (skipMissing) {
-    lines.push(`/* WARNING: possiblemissing characters skipped — index may NOT match character code */`);
+    lines.push(`/* WARNING: missing characters skipped — index may NOT match character code */`);
     lines.push(`/* You may need to create a lookup table or binary search to find the correct entry */`);
   } else {
     lines.push(`/* Index N = character code N (starts at 0) */`);
@@ -2160,14 +2164,15 @@ function _runExportCHeader(skipMissing) {
   lines.push('');
   lines.push(`static const ${typeName} ${fontName}_glyphs[${count}][${H}] = {`);
 
-  slots.forEach(({ cp, ch, idx }, slotIdx) => {
-    const hasCh = !!state.glyphs[ch];
-    const rows = hasCh ? bitmapToUintRows(state.glyphs[ch], W, H) : blankRows;
+  slots.forEach(({ cp, idx }, slotIdx) => {
+    const hasCp = !!state.glyphs[cp];
+    const rows = hasCp ? bitmapToUintRows(state.glyphs[cp], W, H) : blankRows;
     const isPrint = cp >= 32 && cp < 127;
+    const ch = cpToChar(cp);
     const charLabel = cp === 32 ? 'SPACE'
       : isPrint ? `'${ch}'`
       : `U+${cp.toString(16).toUpperCase().padStart(4,'0')}`;
-    const flag = (!hasCh && !skipMissing) ? '  /* blank */' : '';
+    const flag = (!hasCp && !skipMissing) ? '  /* blank */' : '';
     lines.push(`  /* [${idx}] code ${cp} ${charLabel} */${flag}`);
     const rowLines = [];
     for (let i = 0; i < rows.length; i += 4) {
@@ -2184,7 +2189,7 @@ function _runExportCHeader(skipMissing) {
   lines.push(`#endif /* ${guard} */`);
   lines.push('');
 
-  const defined = glyphKeys.filter(ch => ch.codePointAt(0) <= maxCp).length;
+  const defined = glyphKeys.filter(cp => cp <= maxCp).length;
   const blanks = count - defined;
   const content = lines.join('\n');
   const blob = new Blob([content], { type: 'text/plain' });
@@ -2295,8 +2300,7 @@ function parseCHeader(text) {
     // skip all-zero (blank) entries
     const allZero = hexVals.every(v => BigInt(v) === 0n);
     if (!allZero) {
-      const ch = String.fromCodePoint(cp);
-      newGlyphs[ch] = uintRowsToBitmap(hexVals, W, H);
+      newGlyphs[cp] = uintRowsToBitmap(hexVals, W, H);
     }
   }
 
@@ -2311,7 +2315,7 @@ function parseCHeader(text) {
   renderGlyphList();
   updateStats();
   updateTextPreview();
-  const keys = Object.keys(newGlyphs).sort((a, b) => a.codePointAt(0) - b.codePointAt(0));
+  const keys = Object.keys(newGlyphs).map(Number).sort((a, b) => a - b);
   if (keys.length) selectGlyph(keys[0]);
   toast(`Imported ${count} glyph(s) from .h (${W}×${H})`);
   scheduleAutosave();
@@ -2490,12 +2494,12 @@ function b64ToU8(str) {
 
 function serializeState() {
   const glyphsSerial = {};
-  for (const ch in state.glyphs) {
-    glyphsSerial[ch] = u8ToB64(state.glyphs[ch]);
+  for (const cp in state.glyphs) {
+    glyphsSerial[cp] = u8ToB64(state.glyphs[cp]);
   }
   return JSON.stringify({
     glyphs:          glyphsSerial,
-    current:         state.current,
+    current:         state.current,   // null | number
     tool:            state.tool,
     cellSize:        state.cellSize,
     cellSizePreview: state.cellSizePreview,
@@ -2534,10 +2538,10 @@ function applySerializedState(json) {
     _colorIdx  = state.helperLines.length;
   }
 
-  // Restore glyphs (Base64 → Uint8Array)
+  // Restore glyphs (Base64 → Uint8Array), keys stored as numeric strings → convert to Number
   state.glyphs = {};
-  for (const ch in (saved.glyphs || {})) {
-    try { state.glyphs[ch] = b64ToU8(saved.glyphs[ch]); } catch {}
+  for (const cp in (saved.glyphs || {})) {
+    try { state.glyphs[Number(cp)] = b64ToU8(saved.glyphs[cp]); } catch {}
   }
 
   // Restore UI inputs
@@ -2589,15 +2593,15 @@ function applySerializedState(json) {
   drawOverlay();
   switchTab(saved.centerTab ?? 'editor');
 
-  // Select the previously active glyph
-  const cur = saved.current;
-  if (cur && state.glyphs[cur]) {
+  // Select the previously active glyph — saved.current is a number (or null)
+  const cur = saved.current !== undefined && saved.current !== null ? Number(saved.current) : null;
+  if (cur !== null && state.glyphs[cur]) {
     state.current = cur;
-    document.getElementById('editorBigLabel').textContent = cur;
+    document.getElementById('editorBigLabel').textContent = cpToChar(cur);
     syncGrid();
     updateBDFPreview(); updateUintPreview();
     const list = document.getElementById('glyphList');
-    const target = list.querySelector(`[data-ch="${CSS.escape(cur)}"]`);
+    const target = list.querySelector(`[data-ch="${cur}"]`);
     if (target) {
       target.querySelector('.glyph-item').classList.add('active');
       target.scrollIntoView({ block: 'nearest', behavior: 'instant' });
