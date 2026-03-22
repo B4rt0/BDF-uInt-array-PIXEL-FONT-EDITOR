@@ -68,7 +68,7 @@
 
   .app {
     display: grid;
-    grid-template-columns: 280px 1fr 260px;
+    grid-template-columns: 280px 1fr 280px;
     height: calc(100vh - 64px);
     gap: 0;
   }
@@ -195,11 +195,18 @@
     object-fit: contain;
   }
 
+
+
   .glyph-label { font-size: 0.72rem; color: var(--text-dim); }
   .glyph-label strong { color: var(--text); font-weight: normal; font-size: 1.1rem; }
-  .glyph-del { font-size: 1rem; color: var(--text-dim); cursor: pointer; padding: 2px 5px; }
+
+  .glyph-rename, .glyph-del, .glyph-copy {
+    padding: 2px;
+    font-size: 1rem; 
+    color: var(--text-dim);
+    cursor: pointer;
+  }
   .glyph-del:hover { color: #ff4466; }
-  .glyph-copy { margin-left: auto; font-size: 1rem; color: var(--text-dim); cursor: pointer; padding: 2px 5px; }
   .glyph-copy:hover { color: var(--accent3); }
 
   /* inline copy-as popup */
@@ -234,6 +241,49 @@
   .copy-as-row button:hover { background: rgba(68,136,255,0.22); }
   .copy-as-row .cancel-btn { border-color: var(--border); color: var(--text-dim); background: transparent; }
   .copy-as-row .cancel-btn:hover { color: #ff4466; border-color: #ff4466; background: transparent; }
+
+  /* ── CUSTOM GLYPH NAME ── */
+  .glyph-name-tag {
+    display: block;
+    font-size: 0.58rem;
+    color: var(--accent2);
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+  }
+  .glyph-rename { margin-left: 2px; margin-left: auto; }
+  .glyph-rename:hover { color: var(--accent2); }
+  .name-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 8px;
+    background: rgba(255,107,53,0.06);
+    border: 1px solid var(--accent2);
+    margin-top: 2px;
+  }
+  .name-edit-row input {
+    flex: 1;
+    font-size: 0.8rem;
+    padding: 3px 6px;
+    border-color: var(--accent2);
+    min-width: 0;
+  }
+  .name-edit-row input:focus { border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(255,107,53,0.2); }
+  .name-edit-row button {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.9rem;
+    padding: 3px 8px;
+    border: 1px solid var(--accent2);
+    background: rgba(255,107,53,0.1);
+    color: var(--accent2);
+    cursor: pointer;
+  }
+  .name-edit-row button:hover { background: rgba(255,107,53,0.22); }
+  .name-edit-row .cancel-btn { border-color: var(--border); color: var(--text-dim); background: transparent; }
+  .name-edit-row .cancel-btn:hover { color: #ff4466; border-color: #ff4466; background: transparent; }
 
   /* ── CENTER – EDITOR AREA ── */
   .center-area {
@@ -853,11 +903,11 @@
       <div class="dim-row">
         <div>
           <label>Offset X</label>
-          <input type="number" id="offsetX" value="0" oninput="saveCurrentGlyph(); scheduleAutosave()">
+          <input type="number" id="offsetX" value="0" oninput="scheduleAutosave()">
         </div>
         <div>
           <label>Offset Y</label>
-          <input type="number" id="offsetY" value="0" oninput="saveCurrentGlyph(); scheduleAutosave()">
+          <input type="number" id="offsetY" value="0" oninput="scheduleAutosave()">
         </div>
       </div>
 
@@ -1048,8 +1098,9 @@ World!</textarea>
 //  STATE
 // ═══════════════════════════════════════════════════
 let state = {
-  glyphs: {},       // char → Uint8Array (W*H bits)
-  current: null,    // currently edited char
+  glyphs: {},       // codepoint (number) → Uint8Array (W*H bits)
+  glyphNames: {},   // codepoint (number) → custom name string (optional)
+  current: null,    // currently edited codepoint (number), or null
   tool: 'toggle',
   painting: false,
   paintVal: 1,
@@ -1363,6 +1414,7 @@ function addASCIICharSet(start, stop) {
 
 function deleteGlyph(cp) {
   delete state.glyphs[cp];
+  delete state.glyphNames[cp];
   if (state.current === cp) {
     state.current = null;
     pixels.forEach(c => c.classList.remove('on'));
@@ -1390,7 +1442,6 @@ function copyGlyphAs(srcCp, destCh) {
 }
 
 function selectGlyph(cp) {
-  saveCurrentGlyph();
   state.current = cp;
   document.getElementById('editorBigLabel').textContent = cpToChar(cp);
   syncGrid();
@@ -1411,6 +1462,35 @@ function selectGlyph(cp) {
 
 function saveCurrentGlyph() {
   // bitmap is already live-updated, nothing to flush
+}
+
+function setGlyphName(cp, name) {
+  if (name) {
+    state.glyphNames[cp] = name;
+  } else {
+    delete state.glyphNames[cp];
+  }
+  // Refresh just the label in the existing DOM node — no full list rebuild
+  const list = document.getElementById('glyphList');
+  const wrapper = list.querySelector(`[data-ch="${cp}"]`);
+  if (wrapper) {
+    const labelEl = wrapper.querySelector('.glyph-label');
+    if (labelEl) {
+      const ch = cpToChar(cp);
+      const cpHex = cp.toString(16).toUpperCase().padStart(4,'0');
+      const nameTag = name
+        ? `<span class="glyph-name-tag" title="${name}">${name}</span>`
+        : '';
+      labelEl.innerHTML = `<strong>${cp === 32 ? '·' : ch}</strong> U+${cpHex} ${nameTag}`;
+    }
+    const renameBtn = wrapper.querySelector('.glyph-rename');
+    if (renameBtn) renameBtn.title = name ? 'Edit custom name' : 'Add custom name';
+  }
+  if (state.current === cp) {
+    updateBDFPreview(); 
+    updateUintPreview();
+  };
+  scheduleAutosave();
 }
 
 // Pending thumb-paint queue: filled by renderGlyphList, drained by rAF
@@ -1456,7 +1536,52 @@ function renderGlyphList() {
     const label = document.createElement('div');
     label.className = 'glyph-label';
     const cpHex = cp.toString(16).toUpperCase().padStart(4,'0');
-    label.innerHTML = `<strong>${cp === 32 ? '·' : ch}</strong> U+${cpHex}`;
+    const nameTag = state.glyphNames[cp]
+      ? `<span class="glyph-name-tag" title="${state.glyphNames[cp]}">${state.glyphNames[cp]}</span>`
+      : '';
+    label.innerHTML = `<strong>${cp === 32 ? '·' : ch}</strong> U+${cpHex} ${nameTag}`;
+
+    // Rename button — opens inline name-edit row
+    const renameBtn = document.createElement('div');
+    renameBtn.className = 'glyph-rename';
+    renameBtn.title = state.glyphNames[cp] ? 'Edit name' : 'Add custom name';
+    renameBtn.innerHTML = '<i class="fa-solid fa-tag">🔖</i>';
+    renameBtn.onclick = (e) => {
+      e.stopPropagation();
+      const existing = wrapper.querySelector('.name-edit-row');
+      if (existing) { existing.remove(); return; }
+      document.querySelectorAll('.name-edit-row, .copy-as-row').forEach(r => r.remove());
+      const row = document.createElement('div');
+      row.className = 'name-edit-row';
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.placeholder = 'Glyph name…';
+      inp.value = state.glyphNames[cp] || '';
+      inp.maxLength = 64;
+      const saveBtn = document.createElement('button');
+      saveBtn.innerHTML = '<i class="fa-solid fa-check"></i>';
+      saveBtn.title = 'Save';
+      const clearBtn = document.createElement('button');
+      clearBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      clearBtn.title = 'Clear name';
+      clearBtn.className = 'cancel-btn';
+      const commit = () => {
+        setGlyphName(cp, inp.value.trim());
+        row.remove();
+      };
+      saveBtn.onclick = commit;
+      clearBtn.onclick = () => { setGlyphName(cp, ''); row.remove(); };
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape') row.remove();
+      });
+      row.appendChild(inp);
+      row.appendChild(saveBtn);
+      row.appendChild(clearBtn);
+      wrapper.appendChild(row);
+      inp.focus();
+      inp.select();
+    };
 
     const copyBtn = document.createElement('div');
     copyBtn.className = 'glyph-copy';
@@ -1500,6 +1625,7 @@ function renderGlyphList() {
 
     item.appendChild(canvas);
     item.appendChild(label);
+    item.appendChild(renameBtn);
     item.appendChild(copyBtn);
     item.appendChild(del);
     wrapper.appendChild(item);
@@ -1697,8 +1823,11 @@ function glyphToBDF(cp, bm, W, H) {
 
   const rows = bitmapToHexRows(bm, W, srcX, srcY, bdfW, bdfH);
 
-  return [
-    `STARTCHAR ${name}`,
+  const lines = [
+    `STARTCHAR ${name}`,    
+  ];
+  if (state.glyphNames[cp]) lines.push(`COMMENT "custom name: ${state.glyphNames[cp]}"`);
+  lines.push(
     `ENCODING ${cp}`,
     `SWIDTH ${Math.round(W * 1000 / 16)} 0`,
     `DWIDTH ${W} 0`,
@@ -1706,7 +1835,8 @@ function glyphToBDF(cp, bm, W, H) {
     `BITMAP`,
     ...rows,
     `ENDCHAR`
-  ].join('\n');
+  );
+  return lines.join('\n');
 }
 
 function generateBDF() {
@@ -2002,7 +2132,7 @@ function updateUintPreview() {
   const cp = state.current;
   const charLabel = cp === 32 ? 'SPACE' : cpToChar(cp);
   const varName = `glyph_${charLabel}_${W}x${H}`;
-  el.textContent = `// U+${cp.toString(16).toUpperCase().padStart(4,'0')} '${charLabel}' — ${W}×${H} px\nconst ${typeName} ${varName}[${H}] = {\n  ${rows.join(',\n  ')}\n};`;
+  el.textContent = `// code: ${cp} - char: '${charLabel}'${state.glyphNames[cp] ? ` - custom name: '${state.glyphNames[cp]}'` : ''} - ${W}×${H} px\nconst ${typeName} ${varName}[${H}] = {\n  ${rows.join(',\n  ')}\n};`;
   el.classList.add('visible');
 }
 
@@ -2173,7 +2303,8 @@ function _runExportCHeader(skipMissing) {
       : isPrint ? `'${ch}'`
       : `U+${cp.toString(16).toUpperCase().padStart(4,'0')}`;
     const flag = (!hasCp && !skipMissing) ? '  /* blank */' : '';
-    lines.push(`  /* [${idx}] code ${cp} ${charLabel} */${flag}`);
+    const nameComment = state.glyphNames[cp] ? ` - custom name: ${state.glyphNames[cp]}` : '';
+    lines.push(`  /* [${idx}] code: ${cp} - char: ${charLabel}${nameComment} */${flag}`);
     const rowLines = [];
     for (let i = 0; i < rows.length; i += 4) {
       rowLines.push(`    ${rows.slice(i, i + 4).join(', ')}`);
@@ -2499,6 +2630,7 @@ function serializeState() {
   }
   return JSON.stringify({
     glyphs:          glyphsSerial,
+    glyphNames:      state.glyphNames,
     current:         state.current,   // null | number
     tool:            state.tool,
     cellSize:        state.cellSize,
@@ -2532,6 +2664,11 @@ function applySerializedState(json) {
   state.helperLines     = saved.helperLines     ?? [];
   state.centerTab       = saved.centerTab       ?? state.centerTab;
   state.previewGaps     = saved.previewGaps     ?? true;
+  // Restore glyph names — keys are numeric strings in JSON, convert to numbers
+  state.glyphNames = {};
+  for (const cp in (saved.glyphNames || {})) {
+    state.glyphNames[Number(cp)] = saved.glyphNames[cp];
+  }
   // Sync _helperUid so new lines get IDs higher than any restored line
   if (state.helperLines.length) {
     _helperUid = Math.max(...state.helperLines.map(l => l.id ?? 0));
@@ -2682,6 +2819,6 @@ function closeModal(id) {
 
 
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/js/all.min.js" integrity="sha512-6BTOlkauINO65nLhXhthZMtepgJSghyimIalb+crKRPhvhmsCdnIuGcVbR5/aQY2A+260iC1OPy1oCdB6pSSwQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/js/all.min.js" integrity="sha512-6BTOlkauINO65nLhXhthZMtepgJSghyimIalb+crKRPhvhmsCdnIuGcVbR5/aQY2A+260iC1OPy1oCdB6pSSwQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> -->
 </body>
 </html>
