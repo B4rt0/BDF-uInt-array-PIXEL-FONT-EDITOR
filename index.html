@@ -630,7 +630,6 @@
   .dropdown-content {
     display: none;
     position: absolute;
-    margin-top: 1px;
     min-width: 160px;
     border: 1px solid var(--border);
     background: var(--surface2);
@@ -743,6 +742,9 @@
     font-size: 0.8rem;
     z-index: 1000;
   }
+  i.fa-solid, i.fa-regular {
+    font-style: normal;
+  }
 </style>
 </head>
 <body>
@@ -751,7 +753,7 @@
   <h1><span>BDF/uInt array</span> PIXEL FONT EDITOR</h1>
   <div class="header-actions">
     <div class="dropdown">
-      <button class="btn blue dropbtn"><i class="fa-solid fa-file-circle-plus"></i> Import <i class="fa-solid fa-angle-down"></i></button>
+      <button class="btn blue dropbtn"><i class="fa-solid fa-file-circle-plus"></i> Import <i class="fa-solid fa-angle-down">&downarrow;</i></button>
       <div class="dropdown-content">
         <button onclick="importBDF()">BDF Glyph Font</button>
         <button onclick="importCHeader()">C header file (.h)</button>
@@ -759,7 +761,7 @@
       </div>
     </div>
     <div class="dropdown">
-      <button class="btn orange dropbtn"><i class="fa-solid fa-download"></i> Export <i class="fa-solid fa-angle-down"></i></button>
+      <button class="btn orange dropbtn"><i class="fa-solid fa-download"></i> Export <i class="fa-solid fa-angle-down">&downarrow;</i></button>
       <div class="dropdown-content">
         <button onclick="exportBDF()">BDF Glyph Font</button>
         <button onclick="exportCHeader()">C header file (.h)</button>
@@ -882,7 +884,7 @@
         <!-- center mark -->
         <div class="helper-row">
           <label><i class="fa-solid fa-ellipsis"></i><i class="fa-solid fa-ellipsis-vertical" style="margin-left: -1rem;"></i> Center mark</label>
-          <button class="helper-toggle on-blue" id="btnCenter" onclick="toggleCenter()"><i class="fa-solid fa-eye"></i></button>
+          <button class="helper-toggle on-blue" id="btnCenter" onclick="toggleCenter()"><i class="fa-solid fa-eye">👁</i></button>
         </div>
         <hr class="sep">
         <!-- helper lines list -->
@@ -904,12 +906,12 @@
             <label>Offset</label>
             <input type="number" id="newLineOffset" value="4" min="0" max="63" style="width:56px">
           </div>
-          <button class="btn primary" data-tooltip="Add helper line" onclick="addHelperLine()" style="align-self:flex-end;padding:7px;font-size: 0.9rem;"><i class="fa-solid fa-plus"></i></button>
+          <button class="btn primary" data-tooltip="Add helper line" onclick="addHelperLine()" style="align-self:flex-end;padding:7px;font-size: 0.9rem;"><i class="fa-solid fa-plus">+</i></button>
         </div>
 
         <div class="helper-row mt-07-rem">
           <label>Show all guides</label>
-          <button class="helper-toggle on-orange" id="btnGuides" onclick="toggleGuides()"><i class="fa-solid fa-eye"></i></button>
+          <button class="helper-toggle on-orange" id="btnGuides" onclick="toggleGuides()"><i class="fa-solid fa-eye">👁</i></button>
         </div>
 
       </div>
@@ -958,10 +960,10 @@
         <canvas id="overlayCanvas"></canvas>
       </div>
       <div class="toolbar p-lr-15-rem">
-        <button class="btn" onclick="transformGlyph('shiftL')"><i class="fa-solid fa-arrow-left"></i> Shift</button>
-        <button class="btn" onclick="transformGlyph('shiftR')"><i class="fa-solid fa-arrow-right"></i> Shift</button>
-        <button class="btn" onclick="transformGlyph('shiftU')"><i class="fa-solid fa-arrow-up"></i> Shift</button>
-        <button class="btn" onclick="transformGlyph('shiftD')"><i class="fa-solid fa-arrow-down"></i> Shift</button>
+        <button class="btn" onclick="transformGlyph('shiftL')"><i class="fa-solid fa-arrow-left">&leftarrow;</i> Shift</button>
+        <button class="btn" onclick="transformGlyph('shiftR')"><i class="fa-solid fa-arrow-right">&rightarrow;</i> Shift</button>
+        <button class="btn" onclick="transformGlyph('shiftU')"><i class="fa-solid fa-arrow-up">&uparrow;</i> Shift</button>
+        <button class="btn" onclick="transformGlyph('shiftD')"><i class="fa-solid fa-arrow-down">&downarrow;</i> Shift</button>
         <button class="btn" onclick="transformGlyph('flipH')"><i class="fa-solid fa-arrows-left-right"></i> Flip H</button>
         <button class="btn" onclick="transformGlyph('flipV')"><i class="fa-solid fa-arrows-up-down"></i> Flip V</button>
         <button class="btn" onclick="transformGlyph('rotCW')"><i class="fa-solid fa-rotate-right"></i> Rotate</button>
@@ -1016,7 +1018,7 @@ World!</textarea>
         <label>Add/Choose Character</label>
         <div class="add-row">
           <input type="text" id="addCharInput" maxlength="1" placeholder="Char..." style="text-align:center;font-size:1.2rem">
-          <button id="addCharInputBtn" class="btn primary" style="margin:auto;font-size:1.2rem"><i class="fa-solid fa-chevron-right"></i></button>
+          <button id="addCharInputBtn" class="btn primary" style="margin:auto;font-size:1.2rem"><i class="fa-solid fa-chevron-right">&rightarrow;</i></button>
         </div>
       </div>
 
@@ -1452,7 +1454,7 @@ function renderGlyphList() {
     const copyBtn = document.createElement('div');
     copyBtn.className = 'glyph-copy';
     copyBtn.title = 'Clone as…';
-    copyBtn.innerHTML = '<i class="fa-regular fa-clone"></i>';
+    copyBtn.innerHTML = '<i class="fa-regular fa-clone">⧉</i>';
     copyBtn.onclick = (e) => {
       e.stopPropagation();
       const existing = wrapper.querySelector('.copy-as-row');
@@ -1465,7 +1467,7 @@ function renderGlyphList() {
       const inp = document.createElement('input');
       inp.type = 'text'; inp.maxLength = 1; inp.placeholder = '?';
       const okBtn = document.createElement('button');
-      okBtn.innerHTML = '<i class="fa-solid fa-check"></i>';
+      okBtn.innerHTML = '<i class="fa-solid fa-check">✔</i>';
       okBtn.title = 'Clone';
       okBtn.onclick = () => { copyGlyphAs(ch, inp.value); row.remove(); };
       inp.addEventListener('keydown', e => {
@@ -1473,7 +1475,7 @@ function renderGlyphList() {
         if (e.key === 'Escape') row.remove();
       });
       const cancelBtn = document.createElement('button');
-      cancelBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      cancelBtn.innerHTML = '<i class="fa-solid fa-xmark">x</i>';
       cancelBtn.className = 'cancel-btn';
       cancelBtn.title = 'Cancel';
       cancelBtn.onclick = () => row.remove();
@@ -1485,7 +1487,8 @@ function renderGlyphList() {
 
     const del = document.createElement('div');
     del.className = 'glyph-del';
-    del.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+    del.title = 'Delete glyph';
+    del.innerHTML = '<i class="fa-solid fa-xmark">x</i>';
     del.onclick = (e) => { e.stopPropagation(); deleteGlyph(ch); };
 
     item.appendChild(canvas);
@@ -1712,7 +1715,7 @@ function generateBDF() {
 
   const lines = [
     `STARTFONT 2.1`,
-    `COMMENT "Generated by BDF/uInt array PIXEL FONT EDITOR, https://github.com/B4rt0/BDF-uInt-array-PIXEL-FONT-EDITOR"`,
+    `COMMENT "Generated by BDF/uInt array PIXEL FONT EDITOR, b4rt0@proton.me"`,
     `FONT -bdfeditor-${name}-medium-r-normal--${H}-${H*10}-75-75-c-${W*10}-iso10646-1`,
     `SIZE ${H} 75 75`,
     `FONTBOUNDINGBOX ${W} ${H} 0 ${-descent}`,
@@ -2381,7 +2384,7 @@ function drawOverlay() {
 function toggleCenter() {
   state.showCenter = !state.showCenter;
   const btn = document.getElementById('btnCenter');
-  btn.innerHTML = state.showCenter ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>';
+  btn.innerHTML = state.showCenter ? '<i class="fa-solid fa-eye">👁</i>' : '<i class="fa-solid fa-eye-slash">👁</i>';
   btn.className = 'helper-toggle' + (state.showCenter ? ' on-blue' : '');
   drawOverlay();
   scheduleAutosave();
@@ -2390,7 +2393,7 @@ function toggleCenter() {
 function toggleGuides() {
   state.showGuides = !state.showGuides;
   const btn = document.getElementById('btnGuides');
-  btn.innerHTML = state.showGuides ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>';
+  btn.innerHTML = state.showGuides ? '<i class="fa-solid fa-eye">👁</i>' : '<i class="fa-solid fa-eye-slash">👁</i>';
   btn.className = 'helper-toggle' + (state.showGuides ? ' on-orange' : '');
   drawOverlay();
   scheduleAutosave();
@@ -2449,13 +2452,13 @@ function renderHelperLinesList() {
     lbl.style.opacity = line.visible ? '1' : '0.4';
 
     const toggleBtn = document.createElement('button');
-    toggleBtn.innerHTML = line.visible ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>';
+    toggleBtn.innerHTML = line.visible ? '<i class="fa-solid fa-eye">👁</i>' : '<i class="fa-solid fa-eye-slash">👁</i>';
     toggleBtn.style.borderColor = line.visible ? 'var(--text-dim)' : 'var(--text-dimmer)';
     toggleBtn.style.color = line.visible ? 'var(--text-dim)' : 'var(--text-dimmer)';
     toggleBtn.onclick = () => toggleHelperLine(line.id);
 
     const delBtn = document.createElement('button');
-    delBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+    delBtn.innerHTML = '<i class="fa-solid fa-xmark">x</i>';
     delBtn.onclick = () => removeHelperLine(line.id);
 
     entry.appendChild(dot);
