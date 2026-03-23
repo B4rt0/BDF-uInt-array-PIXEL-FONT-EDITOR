@@ -1099,7 +1099,7 @@ World!</textarea>
       <div>
         <label>Add/Choose Character</label>
         <div class="add-row">
-          <input type="text" id="addCharInput" maxlength="1" placeholder="Char..." style="text-align:center;font-size:1.2rem">
+          <input type="text" id="addCharInput" maxlength="1" placeholder="Char/U+hex/#int" style="text-align:center;font-size:1.2rem">
           <button id="addCharInputBtn" class="btn primary" style="margin:auto;font-size:1.2rem">⟩</button>
         </div>
       </div>
@@ -1164,6 +1164,11 @@ window.onload = () => {
   charInputBtn.onclick = () => addGlyph(charInput);
   charInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') addGlyph(charInput);
+  });
+  charInput.addEventListener('input', () => {
+    const val = charInput.value;
+    if (val[0] == '#' || val[0] == 'U' || val[0] == 'u') charInput.maxLength = 8; // allow char code input
+    else charInput.maxLength = 1;
   });
 
   // Wire export modal radio warning + backdrop dismiss
@@ -1394,8 +1399,25 @@ function loadGlyphToGrid(ch) {
 // ═══════════════════════════════════════════════════
 function addGlyph(input) {
   const ch = input.value;
+  let cp = undefined;
   if (!ch) return;
-  const cp = charToCp(ch);
+  if(ch[0] === '#') {
+    cp = parseInt(ch.slice(1), 10);
+    if (isNaN(cp) || cp < 0 || cp > 0x10FFFF) {
+      toast('Invalid character code. Use format: #XX (integer) or U+XXXX (hex)', true);
+      return;
+    }
+  }
+  else if(ch.slice(0, 1) === 'U+' || ch.slice(0, 2) === 'u+') {
+    cp = parseInt(ch.slice(2), 16);
+    if (isNaN(cp) || cp < 0 || cp > 0x10FFFF) {
+      toast('Invalid character code. Use format: #XX (integer) or U+XXXX (hex)', true);
+      return;
+    }
+  }
+  else {
+    cp = charToCp(ch);
+  }  
   addSingleGlyph(cp);
   renderGlyphList();
   updateStats();
