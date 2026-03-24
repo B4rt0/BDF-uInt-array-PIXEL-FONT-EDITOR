@@ -1876,11 +1876,8 @@ function glyphToBDF(cp, bm, W, H) {
 
   const rows = bitmapToHexRows(bm, W, srcX, srcY, bdfW, bdfH);
 
-  const lines = [
-    `STARTCHAR ${name}`,    
-  ];
-  if (state.glyphNames[cp]) lines.push(`COMMENT "custom name: ${state.glyphNames[cp]}"`);
-  lines.push(
+  return [
+    `STARTCHAR "${(state.glyphNames[cp] ? state.glyphNames[cp] : name)}"`,
     `ENCODING ${cp}`,
     `SWIDTH ${Math.round(W * 1000 / 16)} 0`,
     `DWIDTH ${W} 0`,
@@ -1888,8 +1885,7 @@ function glyphToBDF(cp, bm, W, H) {
     `BITMAP`,
     ...rows,
     `ENDCHAR`
-  );
-  return lines.join('\n');
+  ].join('\n');
 }
 
 function generateBDF() {
