@@ -2088,7 +2088,7 @@ async function parseBDF(lineIter) {
         continue;
       }
     } else if (c0 === 'S') {
-      if (l.startsWith('STARTCHAR U+') || l.startsWith('STARTCHAR "U+')) continue; // ignore auto-generated names
+      if (l.startsWith('STARTCHAR U+') || l.startsWith('STARTCHAR "U+') || l.startsWith('STARTCHAR char')) continue; // ignore auto-generated names
       if (l.startsWith('STARTCHAR ')) customName = l.slice(10).replace('"', '');
     }
   }
