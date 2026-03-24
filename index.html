@@ -2048,6 +2048,7 @@ async function parseBDF(lineIter) {
   }
 
   let encoding = -1, inBitmap = false;
+  let customName = null;
   let hexRows = [];
   let bbxW = fontW, bbxH = fontH, bbxX = 0, bbxY = 0;
 
@@ -2059,11 +2060,13 @@ async function parseBDF(lineIter) {
 
     if (inBitmap) {
       if (c0 === 'E' && l === 'ENDCHAR') {
-        if (encoding > 0) {
+        if (encoding >= 0) {
           const destY = fontAscent - bbxH - bbxY;
           state.glyphs[encoding] = hexRowsToBitmap(hexRows, fontW, fontH, bbxW, bbxX, destY);
+          if (customName) state.glyphNames[encoding] = customName;
         }
         inBitmap = false; encoding = -1;
+        customName = null;
         bbxW = fontW; bbxH = fontH; bbxX = 0; bbxY = 0;
         hexRows = [];
       } else {
@@ -2084,6 +2087,9 @@ async function parseBDF(lineIter) {
         bbxX = parseInt(p[3]); bbxY = parseInt(p[4]);
         continue;
       }
+    } else if (c0 === 'S') {
+      if (l.startsWith('STARTCHAR U+') || l.startsWith('STARTCHAR "U+')) continue; // ignore auto-generated names
+      if (l.startsWith('STARTCHAR ')) customName = l.slice(10).replace('"', '');
     }
   }
 
