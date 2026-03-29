@@ -2470,9 +2470,20 @@ function parseCHeader(text) {
 
   const body = arrayMatch[1];
 
+  // Pre-build a map of slotIndex → custom name by scanning the comment lines
+  // Comment format: /* [N] code: N - char: X - custom name: NAME */
+  const nameMap = {};
+  const commentRe = /\/\*\s*\[(\d+)\][^*]*-\s*custom name:\s*([^*]+?)\s*\*\//g;
+  let cm;
+  while ((cm = commentRe.exec(body)) !== null) {
+    const idx = parseInt(cm[1]);
+    nameMap[idx] = cm[2].trim();
+  }
+
   // Split by inner { ... } blocks — each block is one glyph
   const glyphBlockRe = /\{([^}]+)\}/g;
   const newGlyphs = {};
+  const newGlyphNames = {};
   let slotIndex = 0;
   let m;
 
@@ -2481,12 +2492,14 @@ function parseCHeader(text) {
     if (!hexVals.length) continue;
 
     const cp = first + slotIndex;
+    const localIdx = slotIndex;
     slotIndex++;
 
     // skip all-zero (blank) entries
     const allZero = hexVals.every(v => BigInt(v) === 0n);
     if (!allZero) {
       newGlyphs[cp] = uintRowsToBitmap(hexVals, W, H);
+      if (nameMap[localIdx]) newGlyphNames[cp] = nameMap[localIdx];
     }
   }
 
@@ -2497,6 +2510,7 @@ function parseCHeader(text) {
   document.getElementById('glyphW').value = W;
   document.getElementById('glyphH').value = H;
   state.glyphs = newGlyphs;
+  state.glyphNames = newGlyphNames;
   buildGrid();
   renderGlyphList();
   updateStats();
